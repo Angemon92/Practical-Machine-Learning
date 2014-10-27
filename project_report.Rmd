@@ -1,0 +1,113 @@
+Practical Machine Learning Course Project Report
+===============================================
+`Stefan Jovanovic 92'`   
+`27.10.2014.`
+
+```{r setoptions, echo=FALSE}
+opts_chunk$set(cache=TRUE)
+```
+
+```{r library, results='hide'}
+library(caret)
+library(rpart)
+library(randomForest)
+```
+
+### Load data
+
+Download data, and load into *your working directory*.
+```{r load}
+data = read.csv("pml-training.csv")
+
+# For second part of project.
+readTest = read.csv("pml-training.csv") 
+```
+Create training (70%) and test (30%) set. 
+```{r}
+inTrain <- createDataPartition(data$classe, p=0.7, list=FALSE)
+train <- data[inTrain,]
+test <- data[-inTrain,]
+```
+
+### Clean the data. 
+
+1.Remove attributes with low variance.
+```{r cleaning1}      
+nzv = nearZeroVar(train,saveMetric=TRUE)
+train = train[,!nzv$nzv]
+```
+
+2.Remove attributes with more than 75% missing values.
+```{r cleaning2}
+nav <- sapply(colnames(train), function(x) if( sum(is.na(train[, x])) > 0.75*nrow(train) )
+                                           {return(T)}else{return(F)})
+train <- train[, !nav]
+```
+
+3.Calculate correlations (each variable vs class column) and find highest.
+```{r cleaning3}
+# Remove column with row numbers.
+train = train[,-1]        
+
+corSpearman <- abs(sapply(colnames(train[, -ncol(train)]), function(x) 
+                                                cor(as.numeric(train[, x]), 
+                                                as.numeric(train$classe),
+                                                method ="spearman")))
+summary(corSpearman)
+```
+
+4.Plot two most affecting predictors.
+```{r cleaning4}
+plot(train[, names(which.max(corSpearman))], train$classe,col=train$classe,
+     pch = 19, cex = 0.1,
+     xlab = names(which.max(corSpearman)),
+     ylab = "Classes" )
+        
+plot(train[, names(which.max(corSpearman[-which.max(corSpearman)]))], train$classe,col=train$classe,
+     pch = 19, cex = 0.1,
+     xlab = names(which.max(corSpearman[-which.max(corSpearman)])),
+     ylab = "Classes" )
+```
+
+### First phase conclusion:
+There doesn't seem to be any strong predictors that correlates with `classe` well, so linear regression will not give as a good model for predicting. Lets try with **trees**.
+
+#### Classification tree, with cross validation.
+```{r classification tree}
+modelFit <- train(classe ~.,method="rpart",data=train,
+                  trControl = trainControl(method = "cv", number = 10))
+modelFit
+```
+Confusion matrix for this model is:
+```{r confusion matrix 1}
+confusionMatrix( table( predict(modelFit,test), test$classe ) )
+```
+Poor accuracy...
+
+#### Random forest.
+```{r random forest}
+modelFitRF = randomForest(classe ~ . , train)
+modelFitRF
+```
+Confusion matrix for this model is:
+```{r confusion matrix 2}
+confusionMatrix( table( predict(modelFitRF,test), test$classe) )
+```
+### Good metrics result, so this is the final model im going to chose.
+
+
+## Project part 2.
+Load testData, do predictions, and save each prediction in .txt file
+```{r, results='hide'}
+# Submitting function (from Cours)
+        pml_write_files = function(x){
+                n = length(x)
+                for(i in 1:n){
+                        filename = paste0("predictions/problem_id_",i,".txt")
+                        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+                }
+        }
+
+answers = predict(modelFitRF,readTest)
+pml_write_files(answers)
+```

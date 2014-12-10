@@ -70,7 +70,7 @@ plot(train[, names(which.max(corSpearman[-which.max(corSpearman)]))], train$clas
 ```
 
 ### First phase conclusion:
-There doesn't seem to be any strong predictors that correlates with `classe` well, so linear regression will not give as a good model for predicting. Lets try with **trees**.
+There doesn't seem to be any strong predictors that correlates with `classe` well, so logistic regression will not give as a good model for predicting. Lets try with **trees**.
 
 #### Classification tree, with cross validation.
 ```{r classification tree}
